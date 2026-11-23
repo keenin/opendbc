@@ -46,9 +46,6 @@ class GmLongitudinalBase(common.CarSafetyTest, common.LongitudinalGasBrakeSafety
     self.assertFalse(self._tx(self.packer.make_can_msg_safety("ASCMGasRegenCmd", 0, values)))
 
   # override these tests from CarSafetyTest, GM longitudinal uses button enable
-  def _pcm_status_msg(self, enable):
-    raise NotImplementedError
-
   def test_disable_control_allowed_from_cruise(self):
     pass
 
@@ -236,25 +233,13 @@ class TestGmCameraLongitudinalEVSafety(TestGmCameraLongitudinalSafety, TestGmEVS
   pass
 
 
-class TestGmIgnition(common.SafetyTestBase):
+class TestGmIgnition(common.CanIgnitionSafetyTest):
   DBC = "gm_global_a_powertrain_generated"
-  SAFETY_MODEL = None
+  IGNITION_VALUES = range(4)
+  IGNITION_ON_VALUES = {2, 3}  # SystemPowerMode 2=Run, 3=Crank Request
 
-  TX_MSGS: list = []
-
-  def _msg(self, mode):
-    return self.packer.make_can_msg_safety("BCMGeneralPlatformStatus", 0, {"SystemPowerMode": mode})
-
-  # SystemPowerMode 2=Run, 3=Crank Request
-  def test_ignition_on(self):
-    self.safety.ignition_can_hook(self._msg(2))
-    self.assertTrue(self.safety.get_ignition_can())
-
-  def test_ignition_off(self):
-    self.safety.ignition_can_hook(self._msg(2))
-    self.assertTrue(self.safety.get_ignition_can())
-    self.safety.ignition_can_hook(self._msg(0))
-    self.assertFalse(self.safety.get_ignition_can())
+  def _ignition_msg(self, value, counter=None, bus=0):
+    return self.packer.make_can_msg_safety("BCMGeneralPlatformStatus", bus, {"SystemPowerMode": value})
 
 
 if __name__ == "__main__":

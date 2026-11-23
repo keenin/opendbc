@@ -29,8 +29,6 @@ MSG_LDW_02     = 0x397
 
 
 class TestVolkswagenMebSafetyBase(common.CarSafetyTest, common.CurvatureSteeringSafetyTest):
-  STANDSTILL_THRESHOLD = 0
-
   MAX_CURVATURE = 29105
   MAX_CURVATURE_TEST = 0.195
   CURVATURE_TO_CAN = 149253.7313
@@ -173,12 +171,6 @@ class TestVolkswagenMebSafetyBase(common.CarSafetyTest, common.CurvatureSteering
     self.assertEqual(0, self.safety.get_curvature_meas_max())
     self.assertEqual(0, self.safety.get_curvature_meas_min())
 
-  def test_brake_signal(self):
-    self._rx(self._user_brake_msg(False))
-    self.assertFalse(self.safety.get_brake_pressed_prev())
-    self._rx(self._user_brake_msg(True))
-    self.assertTrue(self.safety.get_brake_pressed_prev())
-
   def test_torque_driver_measurements(self):
     for t in (0, 100, -100, 250, -250):
       self._rx(self._torque_driver_msg(t))
@@ -188,11 +180,6 @@ class TestVolkswagenMebSafetyBase(common.CarSafetyTest, common.CurvatureSteering
       self.safety.set_controls_allowed(True)
       self._rx(self.packer.make_can_msg_safety("Motor_51", 0, {"TSK_Status": tsk_status}))
       self.assertEqual(tsk_status in (2, 3, 4, 5), self.safety.get_controls_allowed())
-
-  def test_cancel_button_rising_edge(self):
-    self.safety.set_controls_allowed(True)
-    self._rx(self._button_msg(cancel=1, bus=0))
-    self.assertFalse(self.safety.get_controls_allowed())
 
   def test_rx_hook_speed_mismatch(self):
     for speed in np.arange(0, 40, 0.5):
@@ -339,33 +326,14 @@ class TestVolkswagenMebGen2Safety(TestVolkswagenMebSafety):
   SAFETY_PARAM = VolkswagenSafetyFlags.MEB_ALT_CRC
 
 
-# ZAS_Kl_15=1
-class TestVolkswagenMebIgnition(common.SafetyTestBase):
+class TestVolkswagenMebIgnition(common.CanIgnitionSafetyTest):
   DBC = "vw_meb_generated"
-  SAFETY_MODEL = None
+  IGNITION_VALUES = range(2)
+  IGNITION_ON_VALUES = {1}  # ZAS_Kl_15
+  IGNITION_COUNTER_MOD = 16
 
-  TX_MSGS: list = []
-
-  def _msg(self, counter, ign):
-    return self.packer.make_can_msg_safety("Klemmen_Status_01", 0,
-                                           {"Klemmen_Status_01_BZ": counter,
-                                            "ZAS_Kl_15": ign})
-
-  def test_ignition_on(self):
-    for i in range(16):
-      self.safety.init_tests()
-      self.safety.ignition_can_hook(self._msg(i, 1))
-      self.assertFalse(self.safety.get_ignition_can())
-      self.safety.ignition_can_hook(self._msg((i + 1) % 16, 1))
-      self.assertTrue(self.safety.get_ignition_can())
-
-  def test_ignition_off(self):
-    self.safety.ignition_can_hook(self._msg(0, 1))
-    self.safety.ignition_can_hook(self._msg(1, 1))
-    self.assertTrue(self.safety.get_ignition_can())
-    self.safety.ignition_can_hook(self._msg(2, 0))
-    self.safety.ignition_can_hook(self._msg(3, 0))
-    self.assertFalse(self.safety.get_ignition_can())
+  def _ignition_msg(self, value, counter=None, bus=0):
+    return self.packer.make_can_msg_safety("Klemmen_Status_01", bus, {"Klemmen_Status_01_BZ": counter, "ZAS_Kl_15": value})
 
 
 if __name__ == "__main__":
